@@ -12,8 +12,11 @@ pub trait IBookStore<TContractState> {
     fn borrow_book(ref self: TContractState, id: u8);
     fn return_book(ref self: TContractState, id: u8);
     fn get_books(self: @TContractState) -> Array<Book>;
-    // fn get_lent_books(self: @TContractState) -> Array<(ContractAddress, Book)>;
     fn get_book(self: @TContractState, id: u8) -> Book;
+    // NEW FUNCTIONS ADDED
+    fn get_total_books(self: @TContractState) -> u8;
+    fn update_book_title(ref self: TContractState, id: u8, new_title: felt252);
+    fn transfer_storekeeper(ref self: TContractState, new_storekeeper: ContractAddress);
 }
 
 #[starknet::contract]
@@ -30,7 +33,7 @@ pub mod SkillupBookStore {
         pub storekeeper: ContractAddress,
         pub books: Map<u8, Book>,
         pub lent_books: Map<ContractAddress, Book>,
-        pub book_counter: u8 //initialize with 1, start the ids of the books from 1
+        pub book_counter: u8
     }
 
     #[event]
@@ -158,6 +161,33 @@ pub mod SkillupBookStore {
             let existing_book = self.books.entry(id).read();
             assert(existing_book != Default::default(), 'Book does not exist');
             existing_book
+        }
+
+        // NEW FUNCTION 1: READ FUNCTION - Returns total number of books
+        fn get_total_books(self: @ContractState) -> u8 {
+            self.book_counter.read() - 1
+        }
+
+        // NEW FUNCTION 2: WRITE FUNCTION - Updates a book's title
+        fn update_book_title(ref self: ContractState, id: u8, new_title: felt252) {
+            let caller = get_caller_address();
+            let storekeeper = self.storekeeper.read();
+            assert(caller == storekeeper, 'Caller not permitted');
+
+            let mut existing_book = self.books.entry(id).read();
+            assert(existing_book != Default::default(), 'Book does not exist');
+
+            existing_book.title = new_title;
+            self.books.entry(id).write(existing_book);
+        }
+
+        // NEW FUNCTION 3: WRITE FUNCTION - Transfers storekeeper role to new address
+        fn transfer_storekeeper(ref self: ContractState, new_storekeeper: ContractAddress) {
+            let caller = get_caller_address();
+            let current_storekeeper = self.storekeeper.read();
+            assert(caller == current_storekeeper, 'Caller not permitted');
+            
+            self.storekeeper.write(new_storekeeper);
         }
     }
 }
